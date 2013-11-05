@@ -1,13 +1,22 @@
-#
+#!/usr/local/bin python
+# -*- coding: utf-8 -*-
+
 import HTMLParser
+import argparse
+import codecs
+import flickrapi
 import json
+import locale
 import os
 import re
+import sys
+import unicodedata
 import urllib
-import argparse
-import flickrapi
 
-__author__ = 'faisal'
+reload(sys)
+sys.setdefaultencoding("utf-8")
+
+__author__ = 'kenijo'
 
 EXT_IMAGE = ('jpg', 'png', 'jpeg', 'gif', 'bmp')
 EXT_VIDEO = ('avi', 'wmv', 'mov', 'mp4', '3gp', 'ogg', 'ogv', 'mts')
@@ -47,9 +56,11 @@ def start_sync(sync_path, cmd_args):
     # Build your local photo sets
     photo_sets = {}
     skips_root = []
+    exclude_files = ['.*']
+    exclude_folders = ['.*', '@eaDir']
     for r, dirs, files in os.walk(sync_path):
-        files = [f for f in files if not f.startswith('.')]
-        dirs[:] = [d for d in dirs if not d.startswith('.')]
+        files = [f for f in files if f not in exclude_files]
+        dirs[:] = [d for d in dirs if d not in exclude_folders]
 
         for file in files:
             if not file.startswith('.'):
@@ -107,6 +118,7 @@ def start_sync(sync_path, cmd_args):
         for set in sets['photosets']['photoset']:
             # Make sure it's the one from backup format
             desc = html_parser.unescape(set['description']['_content'])
+
             if desc:
                 photo_sets_map[desc] = set['id']
                 title = get_custom_set_title(sync_path + desc)
@@ -226,22 +238,61 @@ def start_sync(sync_path, cmd_args):
         for photo_set in sorted(photo_sets):
             folder = photo_set.replace(sync_path, '')
             display_title = get_custom_set_title(photo_set)
+            
+            # Create tags from folder names
+            # Remove duplicate words from tags
+            tags = ''
+            if cmd_args.generate_tags:
+                def unique_list(l):
+                    ulist = []
+                    [ulist.append(x) for x in l if x not in ulist]
+                    return ulist
+                tags = photo_set
+                tags = tags.replace(sync_path, '')
+                tags = re.sub(r'^\[([\d -]*?)\]', ' ', tags)
+                tags = re.sub(r'\W*\b\w{1,3}\b', ' ', tags)
+                tags=' '.join(unique_list(tags.split()))
+
             print 'Getting photos in set [%s]' % display_title
             photos = get_photos_in_set(folder)
             print 'Found %s photos' % len(photos)
 
             for photo in sorted(photo_sets[photo_set]):
+
                 # Adds skips
                 if cmd_args.ignore_images and photo.split('.').pop().lower() in EXT_IMAGE:
                     continue
                 elif cmd_args.ignore_videos and photo.split('.').pop().lower() in EXT_VIDEO:
                     continue
 
-                if photo in photos or is_windows and photo.replace(os.sep, '/') in photos:
+                photo_exist = False
+                for k, v in photos.iteritems():
+                    if photo == str(k) or is_windows and photo.replace(os.sep, '/') == str(k):
+                        photo_exist = True
+
+                if photo_exist == True:
                     print 'Skipped [%s] already exists in set [%s]' % (photo, display_title)
                 else:
                     print 'Uploading [%s] to set [%s]' % (photo, display_title)
-                    upload_args = {'auth_token': token, 'title': photo, 'hidden': 1, 'is_public': 0, 'is_friend': 0, 'is_family': 0}
+                    upload_args = {
+                        'auth_token': token,
+                        # (Optional) The title of the photo.
+                        'title': photo,
+                        # (Optional) A description of the photo. May contain some limited HTML.
+                        'description': folder,
+                        # (Optional) A space-seperated list of tags to apply to the photo.
+                        'tags': tags,
+                        # (Optional) Set to 0 for no, 1 for yes. Specifies who can view the photo.
+                        'is_public': 0,
+                        'is_friend': 1,
+                        'is_family': 1,
+                        # (Optional) Set to 1 for Safe, 2 for Moderate, or 3 for Restricted.
+                        'safety_level': 1,
+                        # (Optional) Set to 1 for Photo, 2 for Screenshot, or 3 for Other.
+                        'content_type': 1,
+                        # (Optional) Set to 1 to keep the photo in global search results, 2 to hide from public searches.
+                        'hidden': 2
+                    }
 
                     file_path = os.path.join(photo_set, photo)
                     file_stat = os.stat(file_path)
@@ -269,8 +320,8 @@ def main():
     parser.add_argument('--download', type=str, help='download the photos from flickr specify a path or . for all')
     parser.add_argument('--ignore-videos', action='store_true', help='ignore video files')
     parser.add_argument('--ignore-images', action='store_true', help='ignore image files')
-    parser.add_argument('--sync-path', type=str, default=os.getcwd(),
-                        help='specify the sync folder (default is current dir)')
+    parser.add_argument('--sync-path', type=str, default=os.getcwd(), help='specify the sync folder (default is current dir)')
+    parser.add_argument('--generate-tags', action='store_true', help='generate tags based on the name of the photo set')
     parser.add_argument('--custom-set', type=str, help='customize your set name from path with regex')
     parser.add_argument('--custom-set-builder', type=str, help='build your custom set title (default just merge groups)')
     parser.add_argument('--update-custom-set', action='store_true', help='updates your set title from custom set')
