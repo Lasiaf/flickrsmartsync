@@ -186,7 +186,7 @@ def start_sync(sync_path, cmd_args):
                         # Skipts download video for now since it doesn't work
                         continue
                     else:
-                        photos[photo['title']] = photo['url_o'] if is_download else photo['id']
+                        photos[photo['title'].encode("utf-8")] = photo['url_o'] if is_download else photo['id']
 
         return photos
 
