@@ -129,6 +129,8 @@ def start_sync(sync_path, cmd_args):
         # Always upload unix style
         if is_windows:
             folder = folder.replace(os.sep, '/')
+            
+        folder = folder.decode("utf-8")
 
         if folder not in photo_sets_map:
             photosets_args = args.copy()
