@@ -204,18 +204,18 @@ def start_sync(sync_path, cmd_args, specific_path=None):
                 for photo in photos_in_set['photoset']['photo']:
 
                     if is_download and photo.get('media') == 'video':
-                        # photo_args = args.copy()
-                        # photo_args['photo_id'] = photo['id']
-                        # sizes = json.loads(api.photos_getSizes(**photo_args))
-                        # if sizes['stat'] != 'ok':
-                        #     continue
-                        #
-                        # original = filter(lambda s: s['label'].startswith('Site') and s['media'] == 'video', sizes['sizes']['size'])
-                        # if original:
-                        #     photos[photo['title']] = original.pop()['source'].replace('/site/', '/orig/')
+                        photo_args = args.copy()
+                        photo_args['photo_id'] = photo['id']
+                        sizes = json.loads(api.photos_getSizes(**photo_args))
+                        if sizes['stat'] != 'ok':
+                            continue
+                        
+                        original = filter(lambda s: s['label'].startswith('Video Original') and s['media'] == 'video', sizes['sizes']['size'])
+                        if original:
+                            photos[photo['title']] = original.pop()['source']
                         #     print photos
                         # Skipts download video for now since it doesn't work
-                        continue
+                        #continue
                     else:
                         photos[photo['title'].encode('utf-8')] = photo['url_o'] if is_download else photo['id']
 
