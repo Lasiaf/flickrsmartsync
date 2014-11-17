@@ -58,6 +58,32 @@ def start_sync(sync_path, cmd_args, specific_path=None):
         logger.error('Please authorized to use')
         exit(0)
 
+    # Get default user privacy preferences
+    try:
+        #Currently not handled in the flickrapi library
+        privacypref = api.prefs_getPrivacy().getchildren()[0].attrib['privacy']
+        # https://www.flickr.com/services/api/flickr.prefs.getPrivacy.html
+    except:
+        logger.error('Failed to get Flickr privacy preferences.')
+        exit(0)
+
+    #Default to private
+    args.update({
+        'is_public': 0,
+        'is_friend': 0,
+        'is_family': 0
+    })
+
+    #Update if so defined in preferences. Note that the privacy number is a string!
+    if privacypref == '1':
+        args.update({'is_public': 1})
+    elif privacypref == '2':
+        args.update({'is_friend': 1})
+    elif privacypref == '3':
+        args.update({'is_family': 1})
+    elif privacypref == '4':
+        args.update({'is_friend': 1,'is_family': 1})
+
     args.update({'auth_token': token})
 
     # Build your local photo sets
@@ -279,9 +305,9 @@ def start_sync(sync_path, cmd_args, specific_path=None):
                         # (Optional) A description of the photo. May contain some limited HTML.
                         'description': folder,
                         # (Optional) Set to 0 for no, 1 for yes. Specifies who can view the photo.
-                        'is_public': 0,
-                        'is_friend': 0,
-                        'is_family': 0,
+                        'is_public': args['is_public'],
+                        'is_friend': args['is_friend'],
+                        'is_family': args['is_family'],
                         # (Optional) Set to 1 for Safe, 2 for Moderate, or 3 for Restricted.
                         'safety_level': 1,
                         # (Optional) Set to 1 for Photo, 2 for Screenshot, or 3 for Other.
