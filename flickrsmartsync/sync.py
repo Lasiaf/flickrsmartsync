@@ -96,8 +96,8 @@ class Sync(object):
                 for photo_set in photo_sets:
                     logger.info('Set Title: [%s]  Path: [%s]' % (self.remote.get_custom_set_title(photo_set), photo_set))
 
-                if raw_input('Is this your expected custom set titles (y/n):') != 'y':
-                    exit(0)
+                #if raw_input('Is this your expected custom set titles (y/n):') != 'y':
+                   # exit(0)
 
         # Loop through all local photo set map and
         # upload photos that does not exists in online map
