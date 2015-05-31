@@ -31,8 +31,8 @@ def main():
     parser.add_argument('--sync-path', type=str, default=os.getcwd(),
                         help='specify the sync folder (default is current dir)')
     parser.add_argument('--sync-from', type=str, help='If set to "all", then upload anything that isn\'t on flickr, and download anything that isn\'t on the local filesystem')
-    parser.add_argument('--custom-set', type=str, help='customize your set name from path with regex')
-    parser.add_argument('--custom-set-builder', type=str, help='build your custom set title (default just merge groups)')
+    parser.add_argument('--custom-set', type=str, help='If this regular expression matches the fully-qualified path name, the set title will be generated from the captured regex groups rather than the path')
+    parser.add_argument('--custom-set-builder', type=str, help='Custom format string using the groups matched by --custom-set (example: "{0}-{1}"; by default groups are simply concatenated)')
     parser.add_argument('--update-custom-set', action='store_true', help='updates your set title from custom set')
     parser.add_argument('--custom-set-debug', action='store_true', help='for testing your custom sets')
     parser.add_argument('--username', type=str, help='token username')  # token username argument for api
