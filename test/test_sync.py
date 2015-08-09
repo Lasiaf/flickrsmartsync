@@ -47,6 +47,8 @@ class syncTest(unittest.TestCase):
             custom_set=None
             ignore_images=False
             ignore_videos=False
+            ignore_ext=None
+
             is_windows=False
             download="."
             sync_from="all"
