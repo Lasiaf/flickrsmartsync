@@ -2,15 +2,17 @@ import HTMLParser
 import json
 import os
 import re
-import urllib
 import flickrapi
 import logging
+from eventlet.green import urllib
 import eventlet
+# monkey_patch patches urlib2 coming from flickapi
+eventlet.monkey_patch(os=False, select=False, socket=True, thread=False, time=False, psycopg=False)
 
 logger = logging.getLogger("flickrsmartsync")
 
 # Greenify libs
-eventlet.monkey_patch()
+#eventlet.monkey_patch()
 
 #  flickr api keys
 KEY = 'f7da21662566bc773c7c750ddf7030f7'
