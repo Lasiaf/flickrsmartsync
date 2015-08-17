@@ -5,8 +5,12 @@ import re
 import urllib
 import flickrapi
 import logging
+import eventlet
 
 logger = logging.getLogger("flickrsmartsync")
+
+# Greenify libs
+eventlet.monkey_patch()
 
 #  flickr api keys
 KEY = 'f7da21662566bc773c7c750ddf7030f7'

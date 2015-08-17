@@ -1,5 +1,6 @@
 import os
 import logging
+import eventlet
 
 logger = logging.getLogger("flickrsmartsync")
 
@@ -56,11 +57,20 @@ class Sync(object):
                     remote_photos = self.remote.get_photos_in_set(remote_photo_set, get_url=True)
                 local_photos = [photo for photo, file_stat in sorted(local_photo_sets[local_photo_set])]
                 # download what doesn't exist locally
-                for photo in [photo for photo in remote_photos if photo not in local_photos]:
-                    self.remote.download(remote_photos[photo], os.path.join(local_photo_set, photo))
+                pool = eventlet.GreenPool()
+                photos_to_download = [photo for photo in remote_photos if photo not in local_photos]
+                for _ in pool.imap(
+                        lambda p: self.remote.download(remote_photos[p], os.path.join(local_photo_set, p)),
+                    photos_to_download):
+                    pass
+                pool.waitall()
                 # upload what doesn't exist remotely
-                for photo in [photo for photo in local_photos if photo not in remote_photos]:
-                    self.remote.upload(os.path.join(local_photo_set, photo), photo, remote_photo_set)          
+                photos_to_upload = [photo for photo in local_photos if photo not in remote_photos]
+                for _ in pool.imap(
+                        lambda p: self.remote.upload(os.path.join(local_photo_set, p), p, remote_photo_set) ,
+                    photos_to_upload):
+                    pass
+                pool.waitall()
         else:
             logger.warning("Unsupported sync option: %s" % self.cmd_args.sync_from)
 
