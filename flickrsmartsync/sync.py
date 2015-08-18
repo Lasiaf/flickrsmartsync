@@ -1,7 +1,6 @@
 import os
 import logging
 import eventlet
-
 logger = logging.getLogger("flickrsmartsync")
 
 EXT_IMAGE = ('jpg', 'png', 'jpeg', 'gif', 'bmp')
@@ -12,6 +11,7 @@ class Sync(object):
 
     def __init__(self, cmd_args, local, remote):
         global EXT_IMAGE, EXT_VIDEO
+        self.pool = eventlet.GreenPool()
         self.cmd_args = cmd_args
         # Create local and remote objects
         self.local = local
@@ -57,20 +57,20 @@ class Sync(object):
                     remote_photos = self.remote.get_photos_in_set(remote_photo_set, get_url=True)
                 local_photos = [photo for photo, file_stat in sorted(local_photo_sets[local_photo_set])]
                 # download what doesn't exist locally
-                pool = eventlet.GreenPool()
+
                 photos_to_download = [photo for photo in remote_photos if photo not in local_photos]
-                for _ in pool.imap(
+                for _ in self.pool.imap(
                         lambda p: self.remote.download(remote_photos[p], os.path.join(local_photo_set, p)),
                     photos_to_download):
                     pass
-                pool.waitall()
+                self.pool.waitall()
                 # upload what doesn't exist remotely
                 photos_to_upload = [photo for photo in local_photos if photo not in remote_photos]
-                for _ in pool.imap(
+                for _ in self.pool.imap(
                         lambda p: self.remote.upload(os.path.join(local_photo_set, p), p, remote_photo_set) ,
                     photos_to_upload):
                     pass
-                pool.waitall()
+                self.pool.waitall()
         else:
             logger.warning("Unsupported sync option: %s" % self.cmd_args.sync_from)
 
@@ -138,7 +138,16 @@ class Sync(object):
                     if file_stat.st_size >= 1073741824:
                         logger.error('Skipped [%s] over size limit' % photo)
                         continue
-                    file_path = os.path.join(photo_set, photo)                        
-                    photo_id = self.remote.upload(file_path, photo, folder)
-                    if photo_id:
-                        photos[photo] = photo_id
+                    file_path = os.path.join(photo_set, photo)
+                    gthread = self.pool.spawn(self.remote.upload, file_path, photo, folder)
+                    gthread.link(self.uploaded, photo, photos)
+
+            self.pool.waitall()
+
+    @staticmethod
+    def uploaded(gt, *args, **kwargs):
+        photo = args[0]
+        photos = args[1]
+        photo_id = gt.wait()
+        if photo_id:
+            photos[photo] = photo_id

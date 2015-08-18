@@ -35,6 +35,8 @@ class fakeRemote:
         return self.files[self.photo_sets_map[folder]]  
     def upload(self, file_path, photo, folder):
         self.files[self.photo_sets_map[folder]][photo] = fakeid
+        return fakeid
+
     def download(self, url, path):
         fakeLocal.files.values()[0].append((os.path.basename(path), fakestat))
 
