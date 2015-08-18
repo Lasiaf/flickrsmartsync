@@ -96,7 +96,8 @@ class Sync(object):
                         logger.info('Skipped [%s/%s] already downloaded' % (photo_set, photo))
                     else:
                         logger.info('Downloading photo [%s/%s]' % (photo_set, photo))
-                        self.remote.download(photos[photo], path)
+                        self.pool.spawn(self.remote.download, photos[photo], path)
+        self.pool.waitall()
 
     def upload(self, specific_path=None):
         if specific_path is None:
