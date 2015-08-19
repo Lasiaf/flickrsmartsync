@@ -1,6 +1,9 @@
 import os
 import logging
 import eventlet
+import signal
+import sys
+
 logger = logging.getLogger("flickrsmartsync")
 
 EXT_IMAGE = ('jpg', 'png', 'jpeg', 'gif', 'bmp')
@@ -21,6 +24,9 @@ class Sync(object):
             extensions = self.cmd_args.ignore_ext.split(',')
             EXT_IMAGE = filter(lambda e: e not in extensions, EXT_IMAGE)
             EXT_VIDEO = filter(lambda e: e not in extensions, EXT_VIDEO)
+        # Handles KeyboardInterrupt events (CTRL-C or Delete) avoiding data loss during transfers
+        signal.signal(signal.SIGINT, self.signal_handler)
+        self.stopping_transfers = False
 
     def start_sync(self):
         # Do the appropriate one time sync
@@ -86,11 +92,16 @@ class Sync(object):
                     folder = folder.replace('/', os.sep)
 
                 for photo in photos:
+                    if self.stopping_transfers:
+                        logger.info('To avoid data loss, the process will be terminated once ongoing transfers complete')
+                        self.pool.waitall()
+                        return
                     # Adds skips
                     if self.cmd_args.ignore_images and photo.split('.').pop().lower() in EXT_IMAGE:
                         continue
                     elif self.cmd_args.ignore_videos and photo.split('.').pop().lower() in EXT_VIDEO:
                         continue
+
                     path = os.path.join(folder, photo)
                     if os.path.exists(path):
                         logger.info('Skipped [%s/%s] already downloaded' % (photo_set, photo))
@@ -126,6 +137,11 @@ class Sync(object):
             logger.info('Found %s photos' % len(photos))
 
             for photo, file_stat in sorted(photo_sets[photo_set]):
+                if self.stopping_transfers:
+                        logger.info('To avoid data loss, the process will be terminated once ongoing transfers complete')
+                        self.pool.waitall()
+                        return
+
                 # Adds skips
                 if self.cmd_args.ignore_images and photo.split('.').pop().lower() in EXT_IMAGE:
                     continue
@@ -152,3 +168,10 @@ class Sync(object):
         photo_id = gt.wait()
         if photo_id:
             photos[photo] = photo_id
+
+    def signal_handler(self, signal, frame):
+        if self.stopping_transfers:
+            logger.info("Please be patient, the process will be terminated soon.")
+        else:
+            print ("Stopping current operation... please wait to avoid corrupted data")
+            self.stopping_transfers = True
