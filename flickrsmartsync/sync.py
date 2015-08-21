@@ -63,19 +63,19 @@ class Sync(object):
                     remote_photos = self.remote.get_photos_in_set(remote_photo_set, get_url=True)
                 local_photos = [photo for photo, file_stat in sorted(local_photo_sets[local_photo_set])]
                 # download what doesn't exist locally
-
                 photos_to_download = [photo for photo in remote_photos if photo not in local_photos]
-                for _ in self.pool.imap(
-                        lambda p: self.remote.download(remote_photos[p], os.path.join(local_photo_set, p)),
-                    photos_to_download):
-                    pass
+                for p in photos_to_download:
+                    if self.stopping_transfers:
+                        break
+                    self.pool.spawn(self.remote.download, remote_photos[p], os.path.join(local_photo_set, p))
                 self.pool.waitall()
+
                 # upload what doesn't exist remotely
                 photos_to_upload = [photo for photo in local_photos if photo not in remote_photos]
-                for _ in self.pool.imap(
-                        lambda p: self.remote.upload(os.path.join(local_photo_set, p), p, remote_photo_set) ,
-                    photos_to_upload):
-                    pass
+                for p in photos_to_upload:
+                    if self.stopping_transfers:
+                        break
+                    self.pool.spawn(self.remote.upload, os.path.join(local_photo_set, p), p, remote_photo_set)
                 self.pool.waitall()
         else:
             logger.warning("Unsupported sync option: %s" % self.cmd_args.sync_from)
