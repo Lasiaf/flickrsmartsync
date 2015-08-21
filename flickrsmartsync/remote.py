@@ -11,9 +11,6 @@ eventlet.monkey_patch(os=False, select=False, socket=True, thread=False, time=Fa
 
 logger = logging.getLogger("flickrsmartsync")
 
-# Greenify libs
-#eventlet.monkey_patch()
-
 #  flickr api keys
 KEY = 'f7da21662566bc773c7c750ddf7030f7'
 SECRET = 'c329cdaf44c6d3f3'
