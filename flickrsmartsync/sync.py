@@ -2,19 +2,17 @@ import os
 import logging
 import eventlet
 import signal
-import sys
 
 logger = logging.getLogger("flickrsmartsync")
 
 EXT_IMAGE = ('jpg', 'png', 'jpeg', 'gif', 'bmp')
 EXT_VIDEO = ('avi', 'wmv', 'mov', 'mp4', '3gp', 'ogg', 'ogv', 'mts')
 
-
 class Sync(object):
-
+    MAX_CONCURRENT_CONNECTIONS = 15
     def __init__(self, cmd_args, local, remote):
         global EXT_IMAGE, EXT_VIDEO
-        self.pool = eventlet.GreenPool()
+        self.pool = eventlet.GreenPool(self.MAX_CONCURRENT_CONNECTIONS)
         self.cmd_args = cmd_args
         # Create local and remote objects
         self.local = local
