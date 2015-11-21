@@ -1,16 +1,20 @@
 import os
 import logging
+import eventlet
+import eventlet.debug
+import signal
 
 logger = logging.getLogger("flickrsmartsync")
 
 EXT_IMAGE = ('jpg', 'png', 'jpeg', 'gif', 'bmp')
 EXT_VIDEO = ('avi', 'wmv', 'mov', 'mp4', '3gp', 'ogg', 'ogv', 'mts')
 
-
 class Sync(object):
-
+    MAX_CONCURRENT_CONNECTIONS = 15
     def __init__(self, cmd_args, local, remote):
         global EXT_IMAGE, EXT_VIDEO
+        self.pool = eventlet.GreenPool(self.MAX_CONCURRENT_CONNECTIONS)
+        eventlet.debug.hub_prevent_multiple_readers(False) 
         self.cmd_args = cmd_args
         # Create local and remote objects
         self.local = local
@@ -20,6 +24,9 @@ class Sync(object):
             extensions = self.cmd_args.ignore_ext.split(',')
             EXT_IMAGE = filter(lambda e: e not in extensions, EXT_IMAGE)
             EXT_VIDEO = filter(lambda e: e not in extensions, EXT_VIDEO)
+        # Handles KeyboardInterrupt events (CTRL-C or Delete) avoiding data loss during transfers
+        signal.signal(signal.SIGINT, self.signal_handler)
+        self.stopping_transfers = False
 
     def start_sync(self):
         # Do the appropriate one time sync
@@ -56,11 +63,20 @@ class Sync(object):
                     remote_photos = self.remote.get_photos_in_set(remote_photo_set, get_url=True)
                 local_photos = [photo for photo, file_stat in sorted(local_photo_sets[local_photo_set])]
                 # download what doesn't exist locally
-                for photo in [photo for photo in remote_photos if photo not in local_photos]:
-                    self.remote.download(remote_photos[photo], os.path.join(local_photo_set, photo))
+                photos_to_download = [photo for photo in remote_photos if photo not in local_photos]
+                for p in photos_to_download:
+                    if self.stopping_transfers:
+                        break
+                    self.pool.spawn(self.remote.download, remote_photos[p], os.path.join(local_photo_set, p))
+                self.pool.waitall()
+
                 # upload what doesn't exist remotely
-                for photo in [photo for photo in local_photos if photo not in remote_photos]:
-                    self.remote.upload(os.path.join(local_photo_set, photo), photo, remote_photo_set)          
+                photos_to_upload = [photo for photo in local_photos if photo not in remote_photos]
+                for p in photos_to_upload:
+                    if self.stopping_transfers:
+                        break
+                    self.pool.spawn(self.remote.upload, os.path.join(local_photo_set, p), p, remote_photo_set)
+                self.pool.waitall()
         else:
             logger.warning("Unsupported sync option: %s" % self.cmd_args.sync_from)
 
@@ -76,17 +92,23 @@ class Sync(object):
                     folder = folder.replace('/', os.sep)
 
                 for photo in photos:
+                    if self.stopping_transfers:
+                        logger.info('To avoid data loss, the process will be terminated once ongoing transfers complete')
+                        self.pool.waitall()
+                        return
                     # Adds skips
                     if self.cmd_args.ignore_images and photo.split('.').pop().lower() in EXT_IMAGE:
                         continue
                     elif self.cmd_args.ignore_videos and photo.split('.').pop().lower() in EXT_VIDEO:
                         continue
+
                     path = os.path.join(folder, photo)
                     if os.path.exists(path):
                         logger.info('Skipped [%s/%s] already downloaded' % (photo_set, photo))
                     else:
                         logger.info('Downloading photo [%s/%s]' % (photo_set, photo))
-                        self.remote.download(photos[photo], path)
+                        self.pool.spawn(self.remote.download, photos[photo], path)
+        self.pool.waitall()
 
     def upload(self, specific_path=None):
         if specific_path is None:
@@ -115,6 +137,11 @@ class Sync(object):
             logger.info('Found %s photos' % len(photos))
 
             for photo, file_stat in sorted(photo_sets[photo_set]):
+                if self.stopping_transfers:
+                        logger.info('To avoid data loss, the process will be terminated once ongoing transfers complete')
+                        self.pool.waitall()
+                        return
+
                 # Adds skips
                 if self.cmd_args.ignore_images and photo.split('.').pop().lower() in EXT_IMAGE:
                     continue
@@ -128,7 +155,23 @@ class Sync(object):
                     if file_stat.st_size >= 1073741824:
                         logger.error('Skipped [%s] over size limit' % photo)
                         continue
-                    file_path = os.path.join(photo_set, photo)                        
-                    photo_id = self.remote.upload(file_path, photo, folder)
-                    if photo_id:
-                        photos[photo] = photo_id
+                    file_path = os.path.join(photo_set, photo)
+                    gthread = self.pool.spawn(self.remote.upload, file_path, photo, folder)
+                    gthread.link(self.uploaded, photo, photos)
+
+            self.pool.waitall()
+
+    @staticmethod
+    def uploaded(gt, *args, **kwargs):
+        photo = args[0]
+        photos = args[1]
+        photo_id = gt.wait()
+        if photo_id:
+            photos[photo] = photo_id
+
+    def signal_handler(self, signal, frame):
+        if self.stopping_transfers:
+            logger.info("Please be patient, the process will be terminated soon.")
+        else:
+            print ("Stopping ongoing operations... please wait to avoid corrupted data")
+            self.stopping_transfers = True

@@ -2,9 +2,13 @@ import HTMLParser
 import json
 import os
 import re
-import urllib
 import flickrapi
 import logging
+from contextlib import closing
+from eventlet.green import urllib2
+import eventlet
+# monkey_patch patches urlib2 coming from flickapi
+eventlet.monkey_patch(os=False, select=False, socket=True, thread=False, time=False, psycopg=False)
 
 logger = logging.getLogger("flickrsmartsync")
 
@@ -13,7 +17,7 @@ KEY = 'f7da21662566bc773c7c750ddf7030f7'
 SECRET = 'c329cdaf44c6d3f3'
 
 # number of retries for downloads
-RETRIES = 5
+RETRIES = 2
 
 
 class Remote(object):
@@ -203,7 +207,18 @@ class Remote(object):
             os.makedirs(folder)   
         for i in range(RETRIES):
             try:
-                return urllib.urlretrieve(url, path)
+                # urllib.urlretrieve doesn't work well as it should without monkey patching thread
+                with closing(urllib2.urlopen(url)) as u:
+                    meta = u.info()
+                    file_size = int(meta.getheaders("Content-Length")[0])
+                    with open(path, 'wb') as outfile:
+                        while True:
+                            buffer = u.read(8192) #blocksize
+                            if not buffer:
+                                break
+                            outfile.write(buffer)
+                return (path, file_size)
+                #return urllib.urlretrieve(url, path)
             except Exception as e:
                 logger.warning("Retrying download of %s after error: %s" % (path, e))
         # failed many times

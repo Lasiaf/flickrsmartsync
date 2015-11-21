@@ -11,14 +11,14 @@ from flickrsmartsync.local import Local
 logger = logging.getLogger("flickrsmartsync")
 logger.setLevel(logging.WARNING)
 
-class localTest(unittest.TestCase):
 
+class LocalTest(unittest.TestCase):
     def setUp(self):
-        class args:
+        class Args:
             sync_path=here+os.sep
             starts_with=None
             keyword=None
-        self.local = Local(args())
+        self.local = Local(Args())
         self.watch_path = None
 
     def tearDown(self):

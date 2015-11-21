@@ -11,16 +11,18 @@ from flickrsmartsync.remote import Remote, KEY, SECRET
 logger = logging.getLogger("flickrsmartsync")
 logger.setLevel(logging.WARNING)
 
-class authedRemote(Remote):
+
+class AuthedRemote(Remote):
     def auth_api(self):
         token = "72157645636119732-71cd968268ffd2e5"
         self.api = flickrapi.FlickrAPI(KEY, SECRET, username="rqpmbdqm24", token=token)
         return token
 
-class remoteTest(unittest.TestCase):
+
+class RemoteTest(unittest.TestCase):
 
     def setUp(self):
-        class args:
+        class Args:
             username=None
             sync_path=here+os.sep
             custom_set=None
@@ -28,7 +30,7 @@ class remoteTest(unittest.TestCase):
             custom_set_builder=None
             is_windows=False
             download=None
-        self.remote = authedRemote(args())
+        self.remote = AuthedRemote(Args())
         self.deletePhotoset = None
         self.deleteFile = None
         self.deletePhoto = None
