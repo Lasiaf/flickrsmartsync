@@ -1,6 +1,7 @@
 import os
 import logging
 import eventlet
+import eventlet.debug
 import signal
 
 logger = logging.getLogger("flickrsmartsync")
@@ -13,6 +14,7 @@ class Sync(object):
     def __init__(self, cmd_args, local, remote):
         global EXT_IMAGE, EXT_VIDEO
         self.pool = eventlet.GreenPool(self.MAX_CONCURRENT_CONNECTIONS)
+        eventlet.debug.hub_prevent_multiple_readers(False) 
         self.cmd_args = cmd_args
         # Create local and remote objects
         self.local = local
@@ -171,5 +173,5 @@ class Sync(object):
         if self.stopping_transfers:
             logger.info("Please be patient, the process will be terminated soon.")
         else:
-            print ("Stopping current operation... please wait to avoid corrupted data")
+            print ("Stopping ongoing operations... please wait to avoid corrupted data")
             self.stopping_transfers = True
